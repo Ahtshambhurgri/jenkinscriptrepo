@@ -1,10 +1,88 @@
-pipeline{
-    agent any
-    stages{
-        stage('Build') {
+
+pipeline {
+    agent any 
+
+    environment {
+        TOMCAT_HOME = "C:\\Program Files\\Apache Software Foundation\\Tomcat 10.1"
+        WEBAPP = "C:\\Program Files\\Apache Software Foundation\\Tomcat 10.1\\webapps"
+        APP_NAME = "BloodBank"
+    }
+
+    tools {
+        maven 'Maven3'
+        jdk 'JDK25'
+    }
+
+    stages {
+
+        stage('Clone Code') {
             steps {
-                echo 'Building, Jenkins!'
+                git branch: 'main', url: 'https://github.com/Ahtshambhurgri/BloodBankWithJavaJspHibernate.git'
+            }
+        }
+
+        stage('Build Project') {
+            steps {
+                bat 'mvn clean package'
+            }
+        }
+
+        stage('Deploy To Tomcat Server') {
+            steps {
+                bat """
+                rmdir /s /q "%WEBAPP%\\ROOT"
+                del /f /q "%WEBAPP%\\ROOT.war"
+
+                copy target\\BloodBank.war "%WEBAPP%\\ROOT.war"
+                """
+            }
+        }
+
+        stage('Test Application') {
+            steps {
+                bat """
+                powershell -Command "Start-Sleep -Seconds 10"
+                powershell -Command "Invoke-WebRequest http://localhost:8081/ -UseBasicParsing"
+                """
             }
         }
     }
+
+    post {
+        always {
+            echo 'Pipeline execution completed.'
+        }
+
+        success {
+            echo 'Application deployed successfully!'
+            mail to: 'bhurgriahtsham@gmail.com',
+                subject: "SUCCESS: Jenkins Build #${BUILD_NUMBER}",
+                body: """
+                Build Successful!
+
+                Job Name: ${JOB_NAME}
+                Build Number: ${BUILD_NUMBER}
+                URL: ${BUILD_URL}
+
+                Application URL:
+                http://localhost:8081/
+                """
+        }
+
+        failure {
+            echo 'Pipeline failed.'
+            mail to: 'bhurgriahtsham@gmail.com',
+                subject: "FAILURE: Jenkins Build #${BUILD_NUMBER}",
+                body: """
+                Build Failed!
+
+                Job Name: ${JOB_NAME}
+                Build Number: ${BUILD_NUMBER}
+                URL: ${BUILD_URL}
+
+                Please check logs immediately.
+                """
+        }
+    }
 }
+
